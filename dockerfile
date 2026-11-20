@@ -1,8 +1,11 @@
-FROM ghcr.io/cirruslabs/flutter:stable AS build
+
+FROM ghcr.io/cirruslabs/flutter:3.50.1 AS build
 
 WORKDIR /app
 
 COPY . .
+
+RUN flutter --version
 
 RUN flutter pub get
 
