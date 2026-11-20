@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "797661846222",
+    "project_id": "ice-cream-4dfd0",
+    "storage_bucket": "ice-cream-4dfd0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:797661846222:android:ab95dbe6c0d22f3ce1ce9f",
+        "android_client_info": {
+          "package_name": "com.example.ice_cream_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBh-x-mIUXJIk6snKA89RkLyTg3EFFOxqU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
