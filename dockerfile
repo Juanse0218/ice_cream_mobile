@@ -1,11 +1,22 @@
 
-FROM ghcr.io/cirruslabs/flutter:3.50.0 AS build
+FROM ubuntu:24.04 AS build
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV FLUTTER_HOME=/opt/flutter
+ENV PATH="${FLUTTER_HOME}/bin:${FLUTTER_HOME}/bin/cache/dart-sdk/bin:${PATH}"
+
+RUN apt-get update && apt-get install -y \
+    curl git unzip xz-utils zip libglu1-mesa \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone https://github.com/flutter/flutter.git \
+    -b stable --depth 1 ${FLUTTER_HOME}
 
 WORKDIR /app
 
 COPY . .
 
-RUN flutter --version
+RUN flutter doctor -v
 
 RUN flutter pub get
 
