@@ -4,6 +4,7 @@ FROM ubuntu:24.04 AS build
 ENV DEBIAN_FRONTEND=noninteractive
 ENV FLUTTER_HOME=/opt/flutter
 ENV PATH="${FLUTTER_HOME}/bin:${FLUTTER_HOME}/bin/cache/dart-sdk/bin:${PATH}"
+ENV TAR_OPTIONS="--no-same-owner"
 
 RUN apt-get update && apt-get install -y \
     curl git unzip xz-utils zip libglu1-mesa \
@@ -16,7 +17,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN flutter doctor -v
+RUN flutter --version
 
 RUN flutter pub get
 
