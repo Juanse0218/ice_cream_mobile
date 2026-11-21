@@ -15,11 +15,11 @@ class PredictionService {
   // Cliente HTTP reutilizable.
   static final http.Client _client = http.Client();
 
-  // Tiempo máximo de espera.
-  static const Duration _requestTimeout = Duration(seconds: 900);
+  // Tiempos máximos de espera.
+  static const Duration _requestTimeout = Duration(seconds: 180);
   static const Duration _flavorsTimeout = Duration(seconds: 45);
 
-  // Tiempo de almacenamiento de resultados.
+  // Duración de las cachés.
   static const Duration _cacheDuration = Duration(minutes: 15);
   static const Duration _flavorsCacheDuration = Duration(minutes: 10);
 
@@ -30,7 +30,7 @@ class PredictionService {
   // Caché de predicciones.
   static final Map<String, _ForecastCacheEntry> _forecastCache = {};
 
-  // Solicitudes que están actualmente en ejecución.
+  // Solicitudes en ejecución.
   static final Map<String, Future<ForecastResponse>>
       _pendingForecasts = {};
 
@@ -40,7 +40,6 @@ class PredictionService {
   }) async {
     final now = DateTime.now();
 
-    // Usar los sabores almacenados si todavía son válidos.
     if (!forceRefresh &&
         _cachedFlavors != null &&
         _flavorsCacheTime != null &&
@@ -62,8 +61,8 @@ class PredictionService {
       stopwatch.stop();
 
       debugPrint(
-        'PredictionService: consulta de sabores '
-        '${stopwatch.elapsedMilliseconds} ms',
+        'PredictionService: sabores recibidos en '
+        '${stopwatch.elapsedMilliseconds} ms.',
       );
 
       if (response.statusCode == 200) {
@@ -91,7 +90,7 @@ class PredictionService {
     }
   }
 
-  // Solicitar predicciones a FastAPI.
+  // Generar predicciones.
   Future<ForecastResponse> generateForecast({
     required List<String> sabores,
     required int dias,
@@ -101,41 +100,41 @@ class PredictionService {
       throw Exception('Debes seleccionar al menos un sabor.');
     }
 
-    // Crear una clave única para cada combinación de sabores y días.
+    if (dias < 1 || dias > 30) {
+      throw Exception('El número de días debe estar entre 1 y 30.');
+    }
+
     final sortedFlavors = List<String>.from(sabores)..sort();
 
     final cacheKey = '${sortedFlavors.join(',')}-$dias';
 
     final now = DateTime.now();
 
-    // Revisar si existen predicciones almacenadas.
+    // Consultar caché.
     if (!forceRefresh) {
       final cached = _forecastCache[cacheKey];
 
       if (cached != null &&
           now.difference(cached.createdAt) < _cacheDuration) {
         debugPrint(
-          'PredictionService: predicciones obtenidas desde caché '
-          '($cacheKey).',
+          'PredictionService: predicciones obtenidas desde caché.',
         );
 
         return cached.response;
       }
-
-      // Evitar solicitudes duplicadas simultáneas.
-      final pending = _pendingForecasts[cacheKey];
-
-      if (pending != null) {
-        debugPrint(
-          'PredictionService: reutilizando solicitud en ejecución '
-          '($cacheKey).',
-        );
-
-        return pending;
-      }
     }
 
-    // Iniciar la solicitud.
+    // Reutilizar una solicitud que ya está en ejecución.
+    final pending = _pendingForecasts[cacheKey];
+
+    if (pending != null) {
+      debugPrint(
+        'PredictionService: reutilizando solicitud en ejecución.',
+      );
+
+      return pending;
+    }
+
     final request = _requestForecast(
       sabores: sabores,
       dias: dias,
@@ -145,18 +144,15 @@ class PredictionService {
     _pendingForecasts[cacheKey] = request;
 
     try {
-      final result = await request;
-
-      return result;
+      return await request;
     } finally {
-      // Eliminar únicamente la solicitud que terminó.
       if (identical(_pendingForecasts[cacheKey], request)) {
         _pendingForecasts.remove(cacheKey);
       }
     }
   }
 
-  // Ejecutar la petición real al backend.
+  // Petición al backend.
   Future<ForecastResponse> _requestForecast({
     required List<String> sabores,
     required int dias,
@@ -175,6 +171,7 @@ class PredictionService {
             Uri.parse('$baseUrl/api/predictions/forecast'),
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
             body: jsonEncode({
               'sabores': sabores,
@@ -188,7 +185,7 @@ class PredictionService {
       debugPrint(
         'PredictionService: respuesta recibida en '
         '${stopwatch.elapsedMilliseconds} ms. '
-        'Código HTTP: ${response.statusCode}',
+        'HTTP: ${response.statusCode}',
       );
 
       if (response.statusCode == 200) {
@@ -196,7 +193,6 @@ class PredictionService {
 
         final result = ForecastResponse.fromJson(data);
 
-        // Guardar el resultado para futuras consultas.
         _forecastCache[cacheKey] = _ForecastCacheEntry(
           response: result,
           createdAt: DateTime.now(),
@@ -213,8 +209,8 @@ class PredictionService {
       stopwatch.stop();
 
       debugPrint(
-        'PredictionService: tiempo de espera agotado '
-        'después de ${stopwatch.elapsedMilliseconds} ms.',
+        'PredictionService: timeout después de '
+        '${stopwatch.elapsedMilliseconds} ms.',
       );
 
       throw Exception(
@@ -233,7 +229,7 @@ class PredictionService {
     }
   }
 
-  // Limpiar la caché manualmente cuando sea necesario.
+  // Limpiar caché.
   static void clearCache() {
     _forecastCache.clear();
     _cachedFlavors = null;
@@ -241,9 +237,14 @@ class PredictionService {
 
     debugPrint('PredictionService: caché eliminada.');
   }
+
+  // Cerrar cliente HTTP cuando la aplicación ya no lo necesite.
+  static void dispose() {
+    _client.close();
+  }
 }
 
-// Modelo interno para almacenar las predicciones.
+// Modelo interno de caché.
 class _ForecastCacheEntry {
   final ForecastResponse response;
   final DateTime createdAt;

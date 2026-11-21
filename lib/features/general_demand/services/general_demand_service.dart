@@ -12,13 +12,13 @@ class GeneralDemandService {
   // Cliente HTTP reutilizable.
   static final http.Client _client = http.Client();
 
-  // Tiempo máximo de espera del servidor.
-  static const Duration _requestTimeout = Duration(seconds: 900);
+  // Tiempo máximo de espera.
+  static const Duration _requestTimeout = Duration(seconds: 180);
 
-  // Tiempo de almacenamiento de resultados.
+  // Caché durante 30 minutos.
   static const Duration _cacheDuration = Duration(minutes: 30);
 
-  // Caché de resultados por cantidad de días.
+  // Caché por cantidad de días.
   static final Map<int, _GeneralDemandCacheEntry> _cache = {};
 
   // Solicitudes en ejecución.
@@ -33,15 +33,15 @@ class GeneralDemandService {
     required int dias,
     bool forceRefresh = false,
   }) async {
-    if (dias <= 0) {
+    if (dias <= 0 || dias > 30) {
       throw Exception(
-        'La cantidad de días debe ser mayor que cero.',
+        'La cantidad de días debe estar entre 1 y 30.',
       );
     }
 
     final now = DateTime.now();
 
-    // 1. Consultar caché cuando no se solicita actualización.
+    // 1. Consultar caché.
     if (!forceRefresh) {
       final cached = _cache[dias];
 
@@ -54,20 +54,20 @@ class GeneralDemandService {
 
         return cached.response;
       }
-
-      // 2. Reutilizar una solicitud en ejecución.
-      final pending = _pendingRequests[dias];
-
-      if (pending != null) {
-        debugPrint(
-          'GeneralDemandService: reutilizando solicitud pendiente.',
-        );
-
-        return pending;
-      }
     }
 
-    // 3. Consultar el backend.
+    // 2. Evitar solicitudes duplicadas.
+    final pending = _pendingRequests[dias];
+
+    if (pending != null) {
+      debugPrint(
+        'GeneralDemandService: reutilizando solicitud pendiente.',
+      );
+
+      return pending;
+    }
+
+    // 3. Ejecutar solicitud.
     final request = _requestGeneralForecast(dias);
 
     _pendingRequests[dias] = request;
@@ -75,7 +75,6 @@ class GeneralDemandService {
     try {
       return await request;
     } finally {
-      // Evitar eliminar una solicitud más reciente.
       if (identical(_pendingRequests[dias], request)) {
         _pendingRequests.remove(dias);
       }
@@ -131,7 +130,7 @@ class GeneralDemandService {
 
         final result = GeneralDemandResponse.fromJson(decodedData);
 
-        // Guardar únicamente respuestas correctas.
+        // Guardar respuesta correcta.
         _cache[dias] = _GeneralDemandCacheEntry(
           response: result,
           createdAt: DateTime.now(),
@@ -139,7 +138,7 @@ class GeneralDemandService {
 
         debugPrint(
           'GeneralDemandService: resultados guardados '
-          'en caché durante 30 minutos.',
+          'durante 30 minutos.',
         );
 
         return result;
@@ -208,6 +207,14 @@ class GeneralDemandService {
     debugPrint(
       'GeneralDemandService: caché eliminada.',
     );
+  }
+
+  // =========================================================
+  // CERRAR CLIENTE
+  // =========================================================
+
+  static void dispose() {
+    _client.close();
   }
 }
 
