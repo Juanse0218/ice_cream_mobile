@@ -10,7 +10,7 @@ import '../models/prediction_models.dart';
 class PredictionService {
   // Backend desplegado en Render.
   static const String baseUrl =
-      'https://backend-python-qc7r.onrender.com';
+      'https://backend-python-g4a6.onrender.com';
 
   // Cliente HTTP reutilizable.
   static final http.Client _client = http.Client();
